@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Clock, 
@@ -8,7 +7,8 @@ import {
   Share2, 
   ImagePlus, 
   FileSpreadsheet,
-  Zap
+  Zap,
+  Loader2
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,10 +16,33 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/components/ui/use-toast';
 import FeatureCard from '@/components/FeatureCard';
+import { workflowApi } from '@/services/api';
+import { IWorkflow } from '../../wizard-backend/src/services/workflow.service';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [workflows, setWorkflows] = useState<IWorkflow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchWorkflows();
+  }, []);
+
+  const fetchWorkflows = async () => {
+    try {
+      const data = await workflowApi.getAllWorkflows();
+      setWorkflows(data);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch workflows",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleCardClick = (feature: string) => {
     navigate(`/wizard/${feature.toLowerCase().replace(/\s/g, '-')}`);
@@ -51,7 +74,7 @@ const Dashboard = () => {
         </p>
         
         <div className="flex flex-wrap gap-3">
-          <Button onClick={() => navigate('/create-workflow')}>
+          <Button onClick={() => handleCardClick('create-workflow')}>
             Create New Workflow
           </Button>
           <Button variant="outline" onClick={handleQuickAction}>
@@ -73,41 +96,43 @@ const Dashboard = () => {
           </Button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : workflows.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {workflows.slice(0, 2).map((workflow) => (
+              <Card key={workflow._id || `temp-${workflow.name}-${workflow.updatedAt}`}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-md">{workflow.name}</CardTitle>
+                  <CardDescription className="flex justify-between items-center">
+                    <span>Last updated: {new Date(workflow.updatedAt).toLocaleDateString()}</span>
+                    <span className={workflow.status === 'active' ? 'text-success' : 'text-muted'} >
+                      {workflow.status}
+                    </span>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Progress 
+                    value={65} 
+                    className="h-2 mb-2" 
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{workflow.source.type}</span>
+                    <span>{workflow.processingOptions.outputFormat}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-md">Content Creation Assistant</CardTitle>
-              <CardDescription className="flex justify-between items-center">
-                <span>Last run: 2 hours ago</span>
-                <span className="text-success font-medium">Active</span>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Progress value={65} className="h-2 mb-2" />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>1,950 tasks completed</span>
-                <span>3,000 total</span>
-              </div>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              <p>No workflows created yet. Create your first workflow to get started!</p>
             </CardContent>
           </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-md">Email Summarizer</CardTitle>
-              <CardDescription className="flex justify-between items-center">
-                <span>Last run: 30 minutes ago</span>
-                <span className="text-success font-medium">Active</span>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Progress value={89} className="h-2 mb-2" />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>356 tasks completed</span>
-                <span>400 total</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        )}
       </div>
 
       {/* Templates */}
